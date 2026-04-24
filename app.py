@@ -43,11 +43,13 @@ def save_message(user_id, username, first_name, group_id):
 @bot.message_handler(commands=['test'])
 def test_handler(message):
     try:
-        print(f"test 명령어 받음! chat_id: {message.chat.id}")
-        bot.reply_to(message, "봇 작동 중! ✅")
-        print("응답 전송 완료!")
+        print(f"test 명령어 받음! chat_id: {message.chat.id}, user_id: {message.from_user.id}")
+        result = bot.reply_to(message, "봇 작동 중! ✅")
+        print(f"응답 전송 완료! message_id: {result.message_id}")
     except Exception as e:
+        import traceback
         print(f"test_handler error: {e}")
+        print(traceback.format_exc())
 
 @bot.message_handler(commands=['채팅'])
 def my_stats(message):
