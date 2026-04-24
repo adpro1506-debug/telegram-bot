@@ -39,7 +39,10 @@ def save_message(user_id, username, first_name, group_id):
     db.commit()
     cursor.close()
     db.close()
-
+    
+@bot.message_handler(commands=['test'])
+def test_handler(message):
+    bot.reply_to(message, "봇 작동 중! ✅")
 @bot.message_handler(commands=['채팅'])
 def my_stats(message):
     if message.chat.type == 'private':
