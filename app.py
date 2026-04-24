@@ -1,58 +1,12 @@
 import os
 import telebot
 import psycopg2
-import random
-from io import BytesIO
-from PIL import Image
 from datetime import datetime, timedelta
 from flask import Flask, request
 
 BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
-
-# 각 월마다 2종류 패 (1.png, 1-1.png)
-def get_random_card(month):
-    return random.choice([f"{month}.png", f"{month}-1.png"])
-
-def get_hand_name(c1, c2):
-    cards = sorted([c1, c2])
-
-    # 삼팔광땡 (3광 + 8광)
-    if cards == [3, 8] and '광' in c1_type and '광' in c2_type:
-        return ("삼팔광땡", 200)
-
-    # 광땡 (광 두장)
-    # 땡 (같은 월)
-    if c1 == c2:
-        if c1 == 10:
-            return ("장땡", 99)
-        return (f"{c1}땡", 90 + c1)
-
-    # 알리
-    if cards == [1, 2]:
-        return ("알리", 84)
-    # 독사
-    if cards == [1, 4]:
-        return ("독사", 83)
-    # 구삥
-    if cards == [1, 9]:
-        return ("구삥", 82)
-    # 장삥
-    if cards == [1, 10]:
-        return ("장삥", 81)
-    # 장사
-    if cards == [4, 10]:
-        return ("장사", 80)
-    # 세륙
-    if cards == [4, 6]:
-        return ("세륙", 79)
-
-    # 끗
-    score = (c1 + c2) % 10
-    if score == 0:
-        return ("망통", 0)
-    return (f"{score}끗", score)
 
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
@@ -93,57 +47,6 @@ def handle_all(message):
 
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
-
-        elif message.text and '/섯다' in message.text:
-            first_name = message.from_user.first_name or '사용자'
-
-            # 1~10월 중 랜덤으로 2장씩 뽑기
-            months = list(range(1, 11))
-            random.shuffle(months)
-            user_months = months[:2]
-            bot_months = months[2:4]
-
-            user_files = [get_random_card(m) for m in user_months]
-            bot_files = [get_random_card(m) for m in bot_months]
-
-            user_hand, user_power = get_hand_name(user_months[0], user_months[1])
-            bot_hand, bot_power = get_hand_name(bot_months[0], bot_months[1])
-
-            if user_power > bot_power:
-                result = f"🏆 {first_name}님이 이겼어요!"
-            elif user_power < bot_power:
-                result = f"🤖 봇이 이겼어요!"
-            else:
-                result = "🤝 비겼어요!"
-
-            # 이미지 합치기 (유저 2장 + 봇 2장)
-            card_size = (100, 140)
-            gap = 10
-            divider = 20
-            total_width = card_size[0] * 4 + gap * 3 + divider
-            total_height = card_size[1]
-            result_img = Image.new('RGB', (total_width, total_height), (40, 40, 40))
-
-            all_files = user_files + bot_files
-            for i, fname in enumerate(all_files):
-                path = f"cards/{fname}"
-                img = Image.open(path).convert('RGB')
-                img = img.resize(card_size, Image.LANCZOS)
-                if i < 2:
-                    x = i * (card_size[0] + gap)
-                else:
-                    x = i * (card_size[0] + gap) + divider
-                result_img.paste(img, (x, 0))
-
-            buf = BytesIO()
-            result_img.save(buf, format='PNG')
-            buf.seek(0)
-
-            caption = f"👤 {first_name}님 → {user_hand}\n"
-            caption += f"🤖 봇 → {bot_hand}\n\n"
-            caption += f"{result}"
-
-            bot.send_photo(message.chat.id, buf, caption=caption, reply_to_message_id=message.message_id)
 
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
