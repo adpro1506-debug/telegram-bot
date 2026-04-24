@@ -1,6 +1,6 @@
 import os
 import telebot
-import mysql.connector
+import psycopg2
 from datetime import datetime, timedelta
 from flask import Flask, request
 
@@ -9,12 +9,25 @@ bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
 def get_db():
-    return mysql.connector.connect(
-        host=os.environ.get('DB_HOST'),
-        user=os.environ.get('DB_USER'),
-        password=os.environ.get('DB_PASS'),
-        database=os.environ.get('DB_NAME')
-    )
+    return psycopg2.connect(os.environ.get('DATABASE_URL'))
+
+def init_db():
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_logs (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            username VARCHAR(255),
+            first_name VARCHAR(255),
+            group_id BIGINT NOT NULL,
+            message_date TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    db.commit()
+    cursor.close()
+    db.close()
 
 def save_message(user_id, username, first_name, group_id):
     db = get_db()
@@ -46,7 +59,7 @@ def my_stats(message):
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND message_date>=%s", (user_id, group_id, monday))
     week_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND YEAR(message_date)=YEAR(NOW()) AND MONTH(message_date)=MONTH(NOW())", (user_id, group_id))
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND EXTRACT(YEAR FROM message_date)=EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM message_date)=EXTRACT(MONTH FROM NOW())", (user_id, group_id))
     month_count = cursor.fetchone()[0]
 
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s", (user_id, group_id))
@@ -70,7 +83,7 @@ def weekly_ranking(message):
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT first_name, username, COUNT(*) as cnt FROM chat_logs WHERE group_id=%s AND message_date>=%s GROUP BY user_id ORDER BY cnt DESC LIMIT 5",
+        "SELECT first_name, username, COUNT(*) as cnt FROM chat_logs WHERE group_id=%s AND message_date>=%s GROUP BY user_id, first_name, username ORDER BY cnt DESC LIMIT 5",
         (group_id, monday)
     )
     rows = cursor.fetchall()
@@ -106,6 +119,8 @@ def webhook():
 @app.route('/')
 def index():
     return 'Bot is running!', 200
+
+init_db()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
