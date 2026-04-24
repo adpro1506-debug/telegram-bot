@@ -1,0 +1,3 @@
+pyTelegramBotAPI
+flask
+mysql-connector-python
