@@ -2,6 +2,8 @@ import os
 import telebot
 import psycopg2
 import random
+from io import BytesIO
+from PIL import Image
 from datetime import datetime, timedelta
 from flask import Flask, request
 
@@ -9,11 +11,7 @@ BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# 섯다 게임 상태 저장
-games = {}
-
-# 섯다 패 정의
-CARDS = list(range(1, 11)) * 2  # 1~10 두 장씩
+CARDS = list(range(1, 11)) * 2
 
 def get_card_name(card):
     names = {1: '일', 2: '이', 3: '삼', 4: '사', 5: '오',
@@ -21,60 +19,56 @@ def get_card_name(card):
     return names[card]
 
 def calc_score(c1, c2):
-    total = c1 + c2
-    return total % 10
+    return (c1 + c2) % 10
 
 def get_hand_name(c1, c2):
     cards = sorted([c1, c2])
-    
-    # 구사
     if cards == [9, 4]:
         return ("구사", 100)
-    
-    # 땡
     if c1 == c2:
         if c1 == 10:
             return ("장땡", 99)
         return (f"{get_card_name(c1)}땡", 90 + c1)
-    
-    # 갑오
-    if cards == [4, 10] or cards == [5, 10] or cards == [6, 10] or cards == [7, 10] or cards == [8, 10]:
-        if 10 in cards:
-            other = c1 if c2 == 10 else c2
-            if other in [4, 5, 6, 7, 8]:
-                score = calc_score(c1, c2)
-                if score == 4:
-                    return ("갑오", 85)
-
-    # 알리
     if cards == [1, 2]:
         return ("알리", 84)
-    
-    # 독사
     if cards == [1, 4]:
         return ("독사", 83)
-    
-    # 구삼
     if cards == [9, 3]:
         return ("구삼", 82)
-    
-    # 장삼
     if cards == [10, 3]:
         return ("장삼", 81)
-    
-    # 세륙
     if cards == [3, 6]:
         return ("세륙", 80)
-
-    # 끗 계산
+    if 10 in cards:
+        other = c1 if c2 == 10 else c2
+        if other in [4, 5, 6, 7, 8]:
+            score = calc_score(c1, c2)
+            if score == 4:
+                return ("갑오", 85)
     score = calc_score(c1, c2)
     if score == 0:
-        return ("망통", score)
+        return ("망통", 0)
     return (f"{score}끗", score)
 
-def hand_power(c1, c2):
-    _, power = get_hand_name(c1, c2)
-    return power
+def make_card_image(c1, c2):
+    card_size = (200, 280)
+    gap = 20
+    total_width = card_size[0] * 2 + gap
+    total_height = card_size[1]
+
+    result = Image.new('RGB', (total_width, total_height), (50, 50, 50))
+
+    for i, card_num in enumerate([c1, c2]):
+        path = f"cards/{card_num}.png"
+        img = Image.open(path).convert('RGB')
+        img = img.resize(card_size, Image.LANCZOS)
+        x = i * (card_size[0] + gap)
+        result.paste(img, (x, 0))
+
+    buf = BytesIO()
+    result.save(buf, format='PNG')
+    buf.seek(0)
+    return buf
 
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
@@ -117,41 +111,33 @@ def handle_all(message):
             bot.reply_to(message, "봇 작동 중! ✅")
 
         elif message.text and '/섯다' in message.text:
-            user_id = message.from_user.id
             first_name = message.from_user.first_name or '사용자'
-
             deck = CARDS.copy()
             random.shuffle(deck)
-
             user_cards = [deck.pop(), deck.pop()]
             bot_cards = [deck.pop(), deck.pop()]
 
             user_hand, user_power = get_hand_name(user_cards[0], user_cards[1])
             bot_hand, bot_power = get_hand_name(bot_cards[0], bot_cards[1])
 
-            u1 = get_card_name(user_cards[0])
-            u2 = get_card_name(user_cards[1])
-            b1 = get_card_name(bot_cards[0])
-            b2 = get_card_name(bot_cards[1])
-
             if user_power > bot_power:
-                result = f"🎉 {first_name}님이 이겼어요!"
-                result_emoji = "🏆"
+                result = f"🏆 {first_name}님이 이겼어요!"
             elif user_power < bot_power:
-                result = f"😢 봇이 이겼어요!"
-                result_emoji = "🤖"
+                result = f"🤖 봇이 이겼어요!"
             else:
                 result = "🤝 비겼어요!"
-                result_emoji = "🤝"
 
-            text = f"╔══ 🎴 섯다 ══╗\n\n"
-            text += f"  👤 {first_name}님\n"
-            text += f"  패: {u1} + {u2} → {user_hand}\n\n"
-            text += f"  🤖 봇\n"
-            text += f"  패: {b1} + {b2} → {bot_hand}\n\n"
-            text += f"  {result_emoji} {result}\n"
-            text += "╚═════════════╝"
-            bot.reply_to(message, text)
+            # 유저 패 이미지
+            user_img = make_card_image(user_cards[0], user_cards[1])
+            caption = f"👤 {first_name}님 → {user_hand}"
+            bot.send_photo(message.chat.id, user_img, caption=caption, reply_to_message_id=message.message_id)
+
+            # 봇 패 이미지
+            bot_img = make_card_image(bot_cards[0], bot_cards[1])
+            bot.send_photo(message.chat.id, bot_img, caption=f"🤖 봇 → {bot_hand}")
+
+            # 결과
+            bot.send_message(message.chat.id, f"╔══ 🎴 섯다 결과 ══╗\n\n  {result}\n\n╚══════════════════╝")
 
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
@@ -218,7 +204,6 @@ def handle_all(message):
                 message.from_user.first_name or '',
                 message.chat.id
             )
-            print("메시지 로그 저장!")
 
     except Exception as e:
         import traceback
@@ -229,7 +214,6 @@ def handle_all(message):
 def webhook():
     try:
         json_str = request.stream.read().decode('utf-8')
-        print(f"받은 데이터: {json_str[:200]}")
         update = telebot.types.Update.de_json(json_str)
         if update.message:
             handle_all(update.message)
