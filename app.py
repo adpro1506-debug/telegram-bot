@@ -15,7 +15,7 @@ def init_db():
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chat_logs (@a
+        CREATE TABLE IF NOT EXISTS chat_logs (
             id SERIAL PRIMARY KEY,
             user_id BIGINT NOT NULL,
             username VARCHAR(255),
@@ -47,6 +47,7 @@ def handle_all(message):
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
             print("test 응답 전송!")
+
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
                 return
@@ -63,16 +64,20 @@ def handle_all(message):
             rows = cursor.fetchall()
             cursor.close()
             db.close()
+
             medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
-            text = f"🏆 주간 채팅 랭킹\n📅 {monday} ~ {sunday}\n\n"
+            text = f"╔══ 🏆 주간 랭킹 ══╗\n"
+            text += f"  📅 {monday.strftime('%m/%d')} ~ {sunday.strftime('%m/%d')}\n\n"
             if not rows:
-                text += "이번 주 채팅 기록이 없어요 😅"
+                text += "  채팅 기록이 없어요 😅\n"
             else:
                 for i, row in enumerate(rows):
                     name = row[0] or row[1] or '익명'
-                    text += f"{medals[i]} {name} — {row[2]}개\n"
+                    text += f"  {medals[i]} {name:<10} {row[2]}개\n"
+            text += "╚══════════════════╝"
             bot.reply_to(message, text)
             print("채팅랭킹 응답 전송!")
+
         elif message.text and '/채팅' in message.text:
             if message.chat.type == 'private':
                 return
@@ -93,9 +98,18 @@ def handle_all(message):
             total_count = cursor.fetchone()[0]
             cursor.close()
             db.close()
-            text = f"📊 {first_name}님의 채팅 통계\n\n📅 오늘: {today_count}개\n📆 이번 주: {week_count}개\n🗓 이번 달: {month_count}개\n💬 전체: {total_count}개"
+
+            text = f"╔══ 📊 채팅 통계 ══╗\n"
+            text += f"  👤 {first_name}님\n\n"
+            text += f"  ☀️ 오늘       {today_count}개\n"
+            text += f"  📆 이번 주   {week_count}개\n"
+            text += f"  🗓 이번 달   {month_count}개\n"
+            text += f"  💬 전체      {total_count}개\n"
+            text += f"  🎀 오늘도 열심히 채팅했어요!\n"
+            text += "╚══════════════════╝"
             bot.reply_to(message, text)
             print("채팅 응답 전송!")
+
         elif message.chat.type in ['group', 'supergroup']:
             save_message(
                 message.from_user.id,
@@ -116,7 +130,6 @@ def webhook():
         print(f"받은 데이터: {json_str[:200]}")
         update = telebot.types.Update.de_json(json_str)
         if update.message:
-            print(f"메시지 텍스트: {update.message.text}")
             handle_all(update.message)
         print("처리 완료!")
     except Exception as e:
