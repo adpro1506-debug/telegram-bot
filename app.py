@@ -110,27 +110,46 @@ def handle_all(message):
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
 
-        elif message.text and '/섯다' in message.text:
-            first_name = message.from_user.first_name or '사용자'
-            deck = CARDS.copy()
-            random.shuffle(deck)
-            user_cards = [deck.pop(), deck.pop()]
-            bot_cards = [deck.pop(), deck.pop()]
+      elif message.text and '/섯다' in message.text:
+    first_name = message.from_user.first_name or '사용자'
+    deck = CARDS.copy()
+    random.shuffle(deck)
+    user_cards = [deck.pop(), deck.pop()]
+    bot_cards = [deck.pop(), deck.pop()]
 
-            user_hand, user_power = get_hand_name(user_cards[0], user_cards[1])
-            bot_hand, bot_power = get_hand_name(bot_cards[0], bot_cards[1])
+    user_hand, user_power = get_hand_name(user_cards[0], user_cards[1])
+    bot_hand, bot_power = get_hand_name(bot_cards[0], bot_cards[1])
 
-            if user_power > bot_power:
-                result = f"🏆 {first_name}님이 이겼어요!"
-            elif user_power < bot_power:
-                result = f"🤖 봇이 이겼어요!"
-            else:
-                result = "🤝 비겼어요!"
+    if user_power > bot_power:
+        result = f"🏆 {first_name}님이 이겼어요!"
+    elif user_power < bot_power:
+        result = f"🤖 봇이 이겼어요!"
+    else:
+        result = "🤝 비겼어요!"
 
-            # 유저 패 이미지
-            user_img = make_card_image(user_cards[0], user_cards[1])
-            caption = f"👤 {first_name}님 → {user_hand}"
-            bot.send_photo(message.chat.id, user_img, caption=caption, reply_to_message_id=message.message_id)
+    # 유저 패 + 봇 패 합쳐서 한 장으로
+    card_size = (200, 280)
+    gap = 20
+    total_width = card_size[0] * 4 + gap * 3
+    total_height = card_size[1]
+    result_img = Image.new('RGB', (total_width, total_height), (50, 50, 50))
+
+    for i, card_num in enumerate(user_cards + bot_cards):
+        path = f"cards/{card_num}.png"
+        img = Image.open(path).convert('RGB')
+        img = img.resize(card_size, Image.LANCZOS)
+        x = i * (card_size[0] + gap)
+        result_img.paste(img, (x, 0))
+
+    buf = BytesIO()
+    result_img.save(buf, format='PNG')
+    buf.seek(0)
+
+    caption = f"👤 {first_name}님 → {user_hand}\n"
+    caption += f"🤖 봇 → {bot_hand}\n\n"
+    caption += f"{result}"
+
+    bot.send_photo(message.chat.id, buf, caption=caption, reply_to_message_id=message.message_id)
 
             # 봇 패 이미지
             bot_img = make_card_image(bot_cards[0], bot_cards[1])
