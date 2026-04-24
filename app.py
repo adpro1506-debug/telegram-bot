@@ -48,28 +48,32 @@ def my_stats(message):
     group_id = message.chat.id
     first_name = message.from_user.first_name or '사용자'
 
-    db = get_db()
-    cursor = db.cursor()
+    try:
+        db = get_db()
+        cursor = db.cursor()
 
-    today = datetime.now().date()
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND DATE(message_date)=%s", (user_id, group_id, today))
-    today_count = cursor.fetchone()[0]
+        today = datetime.now().date()
+        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND DATE(message_date)=%s", (user_id, group_id, today))
+        today_count = cursor.fetchone()[0]
 
-    monday = today - timedelta(days=today.weekday())
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND message_date>=%s", (user_id, group_id, monday))
-    week_count = cursor.fetchone()[0]
+        monday = today - timedelta(days=today.weekday())
+        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND message_date>=%s", (user_id, group_id, monday))
+        week_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND EXTRACT(YEAR FROM message_date)=EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM message_date)=EXTRACT(MONTH FROM NOW())", (user_id, group_id))
-    month_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND EXTRACT(YEAR FROM message_date)=EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM message_date)=EXTRACT(MONTH FROM NOW())", (user_id, group_id))
+        month_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s", (user_id, group_id))
-    total_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s", (user_id, group_id))
+        total_count = cursor.fetchone()[0]
 
-    cursor.close()
-    db.close()
+        cursor.close()
+        db.close()
 
-    text = f"📊 {first_name}님의 채팅 통계\n\n📅 오늘: {today_count}개\n📆 이번 주: {week_count}개\n🗓 이번 달: {month_count}개\n💬 전체: {total_count}개"
-    bot.reply_to(message, text)
+        text = f"📊 {first_name}님의 채팅 통계\n\n📅 오늘: {today_count}개\n📆 이번 주: {week_count}개\n🗓 이번 달: {month_count}개\n💬 전체: {total_count}개"
+        bot.reply_to(message, text)
+    except Exception as e:
+        print(f"my_stats error: {e}")
+        bot.reply_to(message, "오류가 발생했어요 😢")
 
 @bot.message_handler(commands=['채팅랭킹'])
 def weekly_ranking(message):
@@ -80,49 +84,62 @@ def weekly_ranking(message):
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
 
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT first_name, username, COUNT(*) as cnt FROM chat_logs WHERE group_id=%s AND message_date>=%s GROUP BY user_id, first_name, username ORDER BY cnt DESC LIMIT 5",
-        (group_id, monday)
-    )
-    rows = cursor.fetchall()
-    cursor.close()
-    db.close()
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT first_name, username, COUNT(*) as cnt FROM chat_logs WHERE group_id=%s AND message_date>=%s GROUP BY user_id, first_name, username ORDER BY cnt DESC LIMIT 5",
+            (group_id, monday)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
 
-    medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
-    text = f"🏆 주간 채팅 랭킹\n📅 {monday} ~ {sunday}\n\n"
+        medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+        text = f"🏆 주간 채팅 랭킹\n📅 {monday} ~ {sunday}\n\n"
 
-    if not rows:
-        text += "이번 주 채팅 기록이 없어요 😅"
-    else:
-        for i, row in enumerate(rows):
-            name = row[0] or row[1] or '익명'
-            text += f"{medals[i]} {name} — {row[2]}개\n"
+        if not rows:
+            text += "이번 주 채팅 기록이 없어요 😅"
+        else:
+            for i, row in enumerate(rows):
+                name = row[0] or row[1] or '익명'
+                text += f"{medals[i]} {name} — {row[2]}개\n"
 
-    bot.reply_to(message, text)
+        bot.reply_to(message, text)
+    except Exception as e:
+        print(f"weekly_ranking error: {e}")
+        bot.reply_to(message, "오류가 발생했어요 😢")
 
 @bot.message_handler(func=lambda m: m.chat.type in ['group', 'supergroup'])
 def log_message(message):
-    save_message(
-        message.from_user.id,
-        message.from_user.username or '',
-        message.from_user.first_name or '',
-        message.chat.id
-    )
+    try:
+        save_message(
+            message.from_user.id,
+            message.from_user.username or '',
+            message.from_user.first_name or '',
+            message.chat.id
+        )
+    except Exception as e:
+        print(f"log_message error: {e}")
 
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
-    import threading
-    update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
-    threading.Thread(target=bot.process_new_updates, args=([update],)).start()
+    try:
+        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
+        bot.process_new_updates([update])
+    except Exception as e:
+        print(f"webhook error: {e}")
     return 'OK', 200
 
 @app.route('/')
 def index():
     return 'Bot is running!', 200
 
-init_db()
+try:
+    init_db()
+    print("DB 초기화 성공!")
+except Exception as e:
+    print(f"DB init error: {e}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
