@@ -126,12 +126,17 @@ def log_message(message):
 def webhook():
     try:
         json_str = request.stream.read().decode('utf-8')
-        print(f"받은 데이터: {json_str[:100]}")
+        print(f"받은 데이터: {json_str[:200]}")
         update = telebot.types.Update.de_json(json_str)
+        if update.message:
+            print(f"메시지 텍스트: {update.message.text}")
+            print(f"채팅 타입: {update.message.chat.type}")
         bot.process_new_updates([update])
         print("처리 완료!")
     except Exception as e:
+        import traceback
         print(f"webhook error: {e}")
+        print(traceback.format_exc())
     return 'OK', 200
 
 @app.route('/')
