@@ -128,8 +128,12 @@ def log_message(message):
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
-        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
-        bot.process_new_updates([update])
+        json_str = request.stream.read().decode('utf-8')
+        update = telebot.types.Update.de_json(json_str)
+        import threading
+        t = threading.Thread(target=bot.process_new_updates, args=([update],))
+        t.daemon = True
+        t.start()
     except Exception as e:
         print(f"webhook error: {e}")
     return 'OK', 200
