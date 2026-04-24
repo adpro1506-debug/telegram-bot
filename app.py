@@ -1,12 +1,80 @@
 import os
 import telebot
 import psycopg2
+import random
 from datetime import datetime, timedelta
 from flask import Flask, request
 
 BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
+
+# 섯다 게임 상태 저장
+games = {}
+
+# 섯다 패 정의
+CARDS = list(range(1, 11)) * 2  # 1~10 두 장씩
+
+def get_card_name(card):
+    names = {1: '일', 2: '이', 3: '삼', 4: '사', 5: '오',
+             6: '육', 7: '칠', 8: '팔', 9: '구', 10: '십'}
+    return names[card]
+
+def calc_score(c1, c2):
+    total = c1 + c2
+    return total % 10
+
+def get_hand_name(c1, c2):
+    cards = sorted([c1, c2])
+    
+    # 구사
+    if cards == [9, 4]:
+        return ("구사", 100)
+    
+    # 땡
+    if c1 == c2:
+        if c1 == 10:
+            return ("장땡", 99)
+        return (f"{get_card_name(c1)}땡", 90 + c1)
+    
+    # 갑오
+    if cards == [4, 10] or cards == [5, 10] or cards == [6, 10] or cards == [7, 10] or cards == [8, 10]:
+        if 10 in cards:
+            other = c1 if c2 == 10 else c2
+            if other in [4, 5, 6, 7, 8]:
+                score = calc_score(c1, c2)
+                if score == 4:
+                    return ("갑오", 85)
+
+    # 알리
+    if cards == [1, 2]:
+        return ("알리", 84)
+    
+    # 독사
+    if cards == [1, 4]:
+        return ("독사", 83)
+    
+    # 구삼
+    if cards == [9, 3]:
+        return ("구삼", 82)
+    
+    # 장삼
+    if cards == [10, 3]:
+        return ("장삼", 81)
+    
+    # 세륙
+    if cards == [3, 6]:
+        return ("세륙", 80)
+
+    # 끗 계산
+    score = calc_score(c1, c2)
+    if score == 0:
+        return ("망통", score)
+    return (f"{score}끗", score)
+
+def hand_power(c1, c2):
+    _, power = get_hand_name(c1, c2)
+    return power
 
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
@@ -44,9 +112,46 @@ def save_message(user_id, username, first_name, group_id):
 def handle_all(message):
     try:
         print(f"메시지 받음: '{message.text}' / 타입: {message.chat.type}")
+
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
-            print("test 응답 전송!")
+
+        elif message.text and '/섯다' in message.text:
+            user_id = message.from_user.id
+            first_name = message.from_user.first_name or '사용자'
+
+            deck = CARDS.copy()
+            random.shuffle(deck)
+
+            user_cards = [deck.pop(), deck.pop()]
+            bot_cards = [deck.pop(), deck.pop()]
+
+            user_hand, user_power = get_hand_name(user_cards[0], user_cards[1])
+            bot_hand, bot_power = get_hand_name(bot_cards[0], bot_cards[1])
+
+            u1 = get_card_name(user_cards[0])
+            u2 = get_card_name(user_cards[1])
+            b1 = get_card_name(bot_cards[0])
+            b2 = get_card_name(bot_cards[1])
+
+            if user_power > bot_power:
+                result = f"🎉 {first_name}님이 이겼어요!"
+                result_emoji = "🏆"
+            elif user_power < bot_power:
+                result = f"😢 봇이 이겼어요!"
+                result_emoji = "🤖"
+            else:
+                result = "🤝 비겼어요!"
+                result_emoji = "🤝"
+
+            text = f"╔══ 🎴 섯다 ══╗\n\n"
+            text += f"  👤 {first_name}님\n"
+            text += f"  패: {u1} + {u2} → {user_hand}\n\n"
+            text += f"  🤖 봇\n"
+            text += f"  패: {b1} + {b2} → {bot_hand}\n\n"
+            text += f"  {result_emoji} {result}\n"
+            text += "╚═════════════╝"
+            bot.reply_to(message, text)
 
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
@@ -64,7 +169,6 @@ def handle_all(message):
             rows = cursor.fetchall()
             cursor.close()
             db.close()
-
             medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
             text = f"╔══ 🏆 주간 랭킹 ══╗\n"
             text += f"  📅 {monday.strftime('%m/%d')} ~ {sunday.strftime('%m/%d')}\n\n"
@@ -76,7 +180,6 @@ def handle_all(message):
                     text += f"  {medals[i]} {name:<10} {row[2]}개\n"
             text += "╚══════════════════╝"
             bot.reply_to(message, text)
-            print("채팅랭킹 응답 전송!")
 
         elif message.text and '/채팅' in message.text:
             if message.chat.type == 'private':
@@ -98,17 +201,15 @@ def handle_all(message):
             total_count = cursor.fetchone()[0]
             cursor.close()
             db.close()
-
             text = f"╔══ 📊 채팅 통계 ══╗\n"
             text += f"  👤 {first_name}님\n\n"
             text += f"  ☀️ 오늘       {today_count}개\n"
             text += f"  📆 이번 주   {week_count}개\n"
             text += f"  🗓 이번 달   {month_count}개\n"
-            text += f"  💬 전체      {total_count}개\n"
+            text += f"  💬 전체      {total_count}개\n\n"
             text += f"  🎀 오늘도 열심히 채팅했어요!\n"
             text += "╚══════════════════╝"
             bot.reply_to(message, text)
-            print("채팅 응답 전송!")
 
         elif message.chat.type in ['group', 'supergroup']:
             save_message(
@@ -118,6 +219,7 @@ def handle_all(message):
                 message.chat.id
             )
             print("메시지 로그 저장!")
+
     except Exception as e:
         import traceback
         print(f"handle_all error: {e}")
