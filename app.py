@@ -12,7 +12,7 @@ def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
 
 def init_db():
-    db = get_db()
+    db = get_db()@
     cursor = db.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
@@ -40,14 +40,17 @@ def save_message(user_id, username, first_name, group_id):
     cursor.close()
     db.close()
     
-@bot.message_handler(commands=['test'])
-def test_handler(message):
+@bot.message_handler(func=lambda m: m.chat.type in ['group', 'supergroup'] and not m.text.startswith('/'))
+def log_message(message):
     try:
-        print(f"test 명령어 받음! chat_id: {message.chat.id}")
-        bot.reply_to(message, "봇 작동 중! ✅")
-        print("응답 전송 완료!")
+        save_message(
+            message.from_user.id,
+            message.from_user.username or '',
+            message.from_user.first_name or '',
+            message.chat.id
+        )
     except Exception as e:
-        print(f"test_handler error: {e}")
+        print(f"log_message error: {e}")
 @bot.message_handler(commands=['채팅'])
 def my_stats(message):
     if message.chat.type == 'private':
