@@ -113,7 +113,9 @@ def log_message(message):
 
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
-    bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode('utf-8'))])
+    import threading
+    update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
+    threading.Thread(target=bot.process_new_updates, args=([update],)).start()
     return 'OK', 200
 
 @app.route('/')
