@@ -1,31 +1,12 @@
 import os
 import telebot
 import psycopg2
-import random
-from io import BytesIO
-from PIL import Image
 from datetime import datetime, timedelta
 from flask import Flask, request
 
 BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
-
-CARDS = list(range(1, 11)) * 2
-
-def get_card_name(card):
-    names = {1: '일', 2: '이', 3: '삼', 4: '사', 5: '오',
-             6: '육', 7: '칠', 8: '팔', 9: '구', 10: '십'}
-    return names[card]
-
-def calc_score(c1, c2):
-    return (c1 + c2) % 10
-
-def get_hand_name(c1, c2):
-    score = calc_score(c1, c2)
-    if score == 0:
-        return ("망통", 0)
-    return (f"{score}끗", score)
 
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
@@ -66,46 +47,6 @@ def handle_all(message):
 
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
-
-        elif message.text and '/섯다' in message.text:
-            first_name = message.from_user.first_name or '사용자'
-            deck = CARDS.copy()
-            random.shuffle(deck)
-            user_cards = [deck.pop(), deck.pop()]
-            bot_cards = [deck.pop(), deck.pop()]
-
-            user_hand, user_power = get_hand_name(user_cards[0], user_cards[1])
-            bot_hand, bot_power = get_hand_name(bot_cards[0], bot_cards[1])
-
-            if user_power > bot_power:
-                result = f"🏆 {first_name}님이 이겼어요!"
-            elif user_power < bot_power:
-                result = f"🤖 봇이 이겼어요!"
-            else:
-                result = "🤝 비겼어요!"
-
-            card_size = (50, 70)
-            gap = 5
-            total_width = card_size[0] * 4 + gap * 3
-            total_height = card_size[1]
-            result_img = Image.new('RGB', (total_width, total_height), (50, 50, 50))
-
-            for i, card_num in enumerate(user_cards + bot_cards):
-                path = f"cards/{card_num}.png"
-                img = Image.open(path).convert('RGB')
-                img = img.resize(card_size, Image.LANCZOS)
-                x = i * (card_size[0] + gap)
-                result_img.paste(img, (x, 0))
-
-            buf = BytesIO()
-            result_img.save(buf, format='PNG')
-            buf.seek(0)
-
-            caption = f"👤 {first_name}님 → {user_hand}\n"
-            caption += f"🤖 봇 → {bot_hand}\n\n"
-            caption += f"{result}"
-
-            bot.send_photo(message.chat.id, buf, caption=caption, reply_to_message_id=message.message_id)
 
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
