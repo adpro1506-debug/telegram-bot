@@ -15,7 +15,7 @@ def init_db():
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chat_logs (
+        CREATE TABLE IF NOT EXISTS chat_logs (@a
             id SERIAL PRIMARY KEY,
             user_id BIGINT NOT NULL,
             username VARCHAR(255),
@@ -115,7 +115,9 @@ def webhook():
         json_str = request.stream.read().decode('utf-8')
         print(f"받은 데이터: {json_str[:200]}")
         update = telebot.types.Update.de_json(json_str)
-        bot.process_new_updates([update])
+        if update.message:
+            print(f"메시지 텍스트: {update.message.text}")
+            handle_all(update.message)
         print("처리 완료!")
     except Exception as e:
         import traceback
