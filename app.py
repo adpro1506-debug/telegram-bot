@@ -42,7 +42,12 @@ def save_message(user_id, username, first_name, group_id):
     
 @bot.message_handler(commands=['test'])
 def test_handler(message):
-    bot.reply_to(message, "봇 작동 중! ✅")
+    try:
+        print(f"test 명령어 받음! chat_id: {message.chat.id}")
+        bot.reply_to(message, "봇 작동 중! ✅")
+        print("응답 전송 완료!")
+    except Exception as e:
+        print(f"test_handler error: {e}")
 @bot.message_handler(commands=['채팅'])
 def my_stats(message):
     if message.chat.type == 'private':
