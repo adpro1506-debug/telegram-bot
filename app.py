@@ -123,11 +123,11 @@ def log_message(message):
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
-        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
-        import threading
-        t = threading.Thread(target=bot.process_new_updates, args=([update],))
-        t.daemon = True
-        t.start()
+        json_str = request.stream.read().decode('utf-8')
+        print(f"받은 데이터: {json_str[:100]}")
+        update = telebot.types.Update.de_json(json_str)
+        bot.process_new_updates([update])
+        print("처리 완료!")
     except Exception as e:
         print(f"webhook error: {e}")
     return 'OK', 200
