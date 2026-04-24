@@ -22,28 +22,6 @@ def calc_score(c1, c2):
     return (c1 + c2) % 10
 
 def get_hand_name(c1, c2):
-    cards = sorted([c1, c2])
-    if cards == [9, 4]:
-        return ("구사", 100)
-    if c1 == c2:
-        if c1 == 10:
-            return ("장땡", 99)
-        return (f"{get_card_name(c1)}땡", 90 + c1)
-    if cards == [1, 2]:
-        return ("알리", 84)
-    if cards == [1, 4]:
-        return ("독사", 83)
-    if cards == [9, 3]:
-        return ("구삼", 82)
-    if cards == [10, 3]:
-        return ("장삼", 81)
-    if cards == [3, 6]:
-        return ("세륙", 80)
-    if 10 in cards:
-        other = c1 if c2 == 10 else c2
-        if other in [4, 5, 6, 7, 8]:
-            if calc_score(c1, c2) == 4:
-                return ("갑오", 85)
     score = calc_score(c1, c2)
     if score == 0:
         return ("망통", 0)
@@ -106,8 +84,8 @@ def handle_all(message):
             else:
                 result = "🤝 비겼어요!"
 
-            card_size = (200, 280)
-            gap = 20
+            card_size = (50, 70)
+            gap = 5
             total_width = card_size[0] * 4 + gap * 3
             total_height = card_size[1]
             result_img = Image.new('RGB', (total_width, total_height), (50, 50, 50))
