@@ -3,6 +3,7 @@ import telebot
 import psycopg2
 from datetime import datetime, timedelta
 from flask import Flask, request
+from youtubesearchpython import VideosSearch
 
 BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -69,6 +70,32 @@ def handle_all(message):
 
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
+
+        elif message.text and '/노래' in message.text:
+            query = message.text.replace('/노래', '').strip()
+            if not query:
+                bot.reply_to(message, "🎵 검색어를 입력해주세요!\n예시: /노래 아이유 좋은날")
+                return
+            bot.reply_to(message, "🔍 검색 중...")
+            try:
+                search = VideosSearch(query, limit=1)
+                results = search.result()
+                if results and results['result']:
+                    video = results['result'][0]
+                    title = video['title']
+                    link = video['link']
+                    duration = video.get('duration', '알 수 없음')
+                    channel = video['channel']['name']
+                    text = f"🎵 {title}\n"
+                    text += f"👤 {channel}\n"
+                    text += f"⏱ {duration}\n\n"
+                    text += f"🔗 {link}"
+                    bot.reply_to(message, text)
+                else:
+                    bot.reply_to(message, "😢 검색 결과가 없어요!")
+            except Exception as e:
+                print(f"youtube search error: {e}")
+                bot.reply_to(message, "😢 검색 중 오류가 발생했어요!")
 
         elif message.text and '/제휴' in message.text:
             bot.reply_to(message, AFFILIATE_TEXT, disable_web_page_preview=True)
