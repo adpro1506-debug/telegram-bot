@@ -1,6 +1,7 @@
 import os
 import telebot
 import psycopg2
+import urllib.parse
 from datetime import datetime, timedelta
 from flask import Flask, request
 
@@ -75,25 +76,11 @@ def handle_all(message):
             if not query:
                 bot.reply_to(message, "🎵 검색어를 입력해주세요!\n예시: /노래 아이유 좋은날")
                 return
-            bot.reply_to(message, "🔍 검색 중...")
-            try:
-                import yt_dlp
-                ydl_opts = {'quiet': True, 'skip_download': True}
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    results = ydl.extract_info(f"ytsearch1:{query}", download=False)
-                    video = results['entries'][0]
-                    title = video['title']
-                    link = f"https://youtube.com/watch?v={video['id']}"
-                    duration = video.get('duration_string', '알 수 없음')
-                    channel = video.get('uploader', '알 수 없음')
-                    text = f"🎵 {title}\n"
-                    text += f"👤 {channel}\n"
-                    text += f"⏱ {duration}\n\n"
-                    text += f"🔗 {link}"
-                    bot.reply_to(message, text)
-            except Exception as e:
-                print(f"youtube search error: {e}")
-                bot.reply_to(message, "😢 검색 중 오류가 발생했어요!")
+            encoded = urllib.parse.quote(query)
+            youtube_url = f"https://www.youtube.com/results?search_query={encoded}"
+            text = f"🎵 {query}\n\n"
+            text += f"🔗 유튜브 검색 결과:\n{youtube_url}"
+            bot.reply_to(message, text)
 
         elif message.text and '/제휴' in message.text:
             bot.reply_to(message, AFFILIATE_TEXT, disable_web_page_preview=True)
