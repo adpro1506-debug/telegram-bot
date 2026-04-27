@@ -77,21 +77,20 @@ def handle_all(message):
                 return
             bot.reply_to(message, "🔍 검색 중...")
             try:
-                search = VideosSearch(query, limit=1)
-                results = search.result()
-                if results and results['result']:
-                    video = results['result'][0]
+                import yt_dlp
+                ydl_opts = {'quiet': True, 'skip_download': True}
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    results = ydl.extract_info(f"ytsearch1:{query}", download=False)
+                    video = results['entries'][0]
                     title = video['title']
-                    link = video['link']
-                    duration = video.get('duration', '알 수 없음')
-                    channel = video['channel']['name']
+                    link = f"https://youtube.com/watch?v={video['id']}"
+                    duration = video.get('duration_string', '알 수 없음')
+                    channel = video.get('uploader', '알 수 없음')
                     text = f"🎵 {title}\n"
                     text += f"👤 {channel}\n"
                     text += f"⏱ {duration}\n\n"
                     text += f"🔗 {link}"
                     bot.reply_to(message, text)
-                else:
-                    bot.reply_to(message, "😢 검색 결과가 없어요!")
             except Exception as e:
                 print(f"youtube search error: {e}")
                 bot.reply_to(message, "😢 검색 중 오류가 발생했어요!")
