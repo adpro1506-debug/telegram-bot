@@ -3,4 +3,4 @@ psycopg2-binary
 flask
 gunicorn
 Pillow
-yt-dlp==2023.12.30
+yt-dlp
