@@ -3,7 +3,6 @@ import telebot
 import psycopg2
 from datetime import datetime, timedelta
 from flask import Flask, request
-from youtubesearchpython import VideosSearch
 
 BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
