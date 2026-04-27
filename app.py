@@ -8,6 +8,28 @@ BOT_TOKEN = '8046489365:AAHAFBz4Ca07KcjqI0EJl76aIAu-rlVHw-4'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+AFFILIATE_TEXT = """❤️카지노❤️
+[평생제휴] 1️⃣렛츠뱃 https://t.me/gamte59/31
+[평생제휴] 2️⃣예스뱃 https://t.me/gamte59/28
+[도파민제휴]3️⃣지엑스뱃 https://t.me/gamte59/44
+[도파민제휴]4️⃣케이비씨겜 https://t.me/gamte59/46
+[도파민제휴]5️⃣블록체인바카라 https://t.me/gamte59/49
+[도파민제휴]6️⃣썬뱃 https://t.me/gamte59/51
+
+❤️급전❤️
+[도파민제휴]1️⃣OR급전 https://t.me/gamte59/16
+[도파민제휴]2️⃣프리티켓 https://t.me/gamte59/33
+
+❤️장집❤️
+[도파민제휴]1️⃣미호 장집 https://t.me/gamte59/37
+
+❤️반환팀❤️
+[도파민제휴]1️⃣울프 반환팀 https://t.me/gamte59/39
+
+❤️충전 계좌매입❤️
+[평생제휴]1️⃣저승사자 https://t.me/gamte59/42
+[도파민제휴]2️⃣김여포 https://t.me/gamte59/58"""
+
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
 
@@ -47,6 +69,9 @@ def handle_all(message):
 
         if message.text and '/test' in message.text:
             bot.reply_to(message, "봇 작동 중! ✅")
+
+        elif message.text and '/제휴' in message.text:
+            bot.reply_to(message, AFFILIATE_TEXT, disable_web_page_preview=True)
 
         elif message.text and '/채팅랭킹' in message.text:
             if message.chat.type == 'private':
