@@ -16,6 +16,7 @@ AFFILIATE_TEXT = """❤️카지노❤️
 [도파민제휴]4️⃣케이비씨겜 https://t.me/gamte59/46
 [도파민제휴]5️⃣블록체인바카라 https://t.me/gamte59/49
 [도파민제휴]6️⃣썬뱃 https://t.me/gamte59/51
+[도마민제휴]7️⃣우루스뱃 https://t.me/gamte59/60
 
 ❤️급전❤️
 [도파민제휴]1️⃣OR급전 https://t.me/gamte59/16
