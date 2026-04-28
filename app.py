@@ -62,6 +62,16 @@ def init_db():
             UNIQUE(user_id, group_id)
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS refill_logs (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            group_id BIGINT NOT NULL,
+            first_name VARCHAR(255),
+            username VARCHAR(255),
+            refill_date TIMESTAMP NOT NULL
+        )
+    """)
     db.commit()
     cursor.close()
     db.close()
@@ -162,18 +172,76 @@ def handle_all(message):
             cursor.close()
             db.close()
 
-            bot.reply_to(message, f"╔══ ✅ 출석 완료 ══╗\n  👤 {first_name}님\n\n  🎁 획득: 100포인트\n  💰 잔여: {total}포인트\n╚══════════════════╝")
+            bot.reply_to(message,
+                f"╔══ ✅ 출석 완료 ══╗\n"
+                f"  👤 {first_name}님\n\n"
+                f"  🎁 획득: 100포인트\n"
+                f"  💰 잔여: {total}포인트\n"
+                f"╚══════════════════╝"
+            )
+
+        # ==================== /리필 ====================
+        elif '/리필' in text:
+            if message.chat.type == 'private':
+                return
+            db = get_db()
+            cursor = db.cursor()
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM refill_logs
+                WHERE user_id=%s AND group_id=%s AND DATE(refill_date)=%s
+            """, (user_id, group_id, today))
+            count = cursor.fetchone()[0]
+
+            if count >= 3:
+                cursor.close()
+                db.close()
+                bot.reply_to(message, "⚠️ 오늘 리필을 3번 모두 사용했어요!\n내일 다시 시도해주세요 😊")
+                return
+
+            cursor.execute("""
+                INSERT INTO refill_logs (user_id, group_id, first_name, username, refill_date)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, group_id, first_name, username, datetime.now()))
+            db.commit()
+            cursor.close()
+            db.close()
+
+            update_point(user_id, group_id, first_name, username, 100)
+            new_point = get_point(user_id, group_id)
+            remaining = 3 - (count + 1)
+
+            bot.reply_to(message,
+                f"╔══ 🔄 리필 완료 ══╗\n"
+                f"  👤 {first_name}님\n\n"
+                f"  🎁 획득: 100포인트\n"
+                f"  💰 잔여: {new_point}포인트\n"
+                f"  📊 오늘 남은 리필: {remaining}회\n"
+                f"╚══════════════════╝"
+            )
 
         # ==================== /포인트 ====================
         elif '/포인트' in text:
             if message.chat.type == 'private':
                 return
             point = get_point(user_id, group_id)
-            bot.reply_to(message, f"╔══ 💰 포인트 ══╗\n  👤 {first_name}님\n\n  💰 잔여: {point}포인트\n╚══════════════════╝")
+            bot.reply_to(message,
+                f"╔══ 💰 포인트 ══╗\n"
+                f"  👤 {first_name}님\n\n"
+                f"  💰 잔여: {point}포인트\n"
+                f"╚══════════════════╝"
+            )
 
         # ==================== /게임 ====================
         elif text.strip() in ['/게임', '/게임@dopamin_ranking_bot']:
-            bot.reply_to(message, "🎮 게임 목록\n\n🎰 /슬롯 [배팅] - 슬롯머신\n🎡 /룰렛 [배팅] - 룰렛\n✌️ /가위바위보 - 가위바위보\n\n⚠️ 참가비: 20포인트")
+            bot.reply_to(message,
+                "🎮 게임 목록\n\n"
+                "🎰 /슬롯 [배팅] - 슬롯머신\n"
+                "🎡 /룰렛 [배팅] - 룰렛\n"
+                "✌️ /가위바위보 [가위/바위/보] - 가위바위보\n\n"
+                "⚠️ 최소 참가비: 20포인트"
+            )
 
         # ==================== /슬롯 ====================
         elif '/슬롯' in text:
@@ -202,41 +270,33 @@ def handle_all(message):
 
             if s1 == s2 == s3:
                 if s1 == '💎':
-                    multiplier = 50
-                    result_text = "💎 JACKPOT! 50배!"
+                    multiplier, result_text = 50, "💎 JACKPOT! 50배!"
                 elif s1 == '7️⃣':
-                    multiplier = 10
-                    result_text = "7️⃣ 럭키세븐! 10배!"
+                    multiplier, result_text = 10, "7️⃣ 럭키세븐! 10배!"
                 elif s1 == '⭐':
-                    multiplier = 7
-                    result_text = "⭐ 스타! 7배!"
+                    multiplier, result_text = 7, "⭐ 스타! 7배!"
                 else:
-                    multiplier = 5
-                    result_text = "🎉 3개 일치! 5배!"
+                    multiplier, result_text = 5, "🎉 3개 일치! 5배!"
                 won = bet * multiplier - bet
             elif s1 == s2 or s2 == s3 or s1 == s3:
-                multiplier = 1.5
-                result_text = "✨ 2개 일치! 1.5배!"
+                multiplier, result_text = 1.5, "✨ 2개 일치! 1.5배!"
                 won = int(bet * 1.5) - bet
             else:
-                multiplier = 0
-                result_text = "💀 꽝!"
+                multiplier, result_text = 0, "💀 꽝!"
                 won = -bet
 
             update_point(user_id, group_id, first_name, username, won)
             new_point = get_point(user_id, group_id)
 
-            result = f"╔══ 🎰 슬롯머신 ══╗\n"
-            result += f"  [ {s1} | {s2} | {s3} ]\n\n"
-            result += f"  {result_text}\n\n"
-            result += f"  배팅: {bet}포인트\n"
-            if won > 0:
-                result += f"  획득: +{won}포인트\n"
-            else:
-                result += f"  손실: {won}포인트\n"
-            result += f"  잔여: {new_point}포인트\n"
-            result += "╚══════════════════╝"
-            bot.reply_to(message, result)
+            bot.reply_to(message,
+                f"╔══ 🎰 슬롯머신 ══╗\n"
+                f"  [ {s1} | {s2} | {s3} ]\n\n"
+                f"  {result_text}\n\n"
+                f"  배팅: {bet}포인트\n"
+                f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
+                f"  잔여: {new_point}포인트\n"
+                f"╚══════════════════╝"
+            )
 
         # ==================== /룰렛 ====================
         elif '/룰렛' in text:
@@ -265,32 +325,21 @@ def handle_all(message):
                 ('🔴 5배', 5, 2),
                 ('💎 10배', 10, 1),
             ]
-            labels = [r[0] for r in roulette]
-            multipliers = [r[1] for r in roulette]
-            weights = [r[2] for r in roulette]
-
-            idx = random.choices(range(len(roulette)), weights=weights)[0]
-            label = labels[idx]
-            multiplier = multipliers[idx]
-
-            if multiplier == 0:
-                won = -bet
-            else:
-                won = int(bet * multiplier) - bet
+            idx = random.choices(range(len(roulette)), weights=[r[2] for r in roulette])[0]
+            label, multiplier, _ = roulette[idx]
+            won = int(bet * multiplier) - bet if multiplier > 0 else -bet
 
             update_point(user_id, group_id, first_name, username, won)
             new_point = get_point(user_id, group_id)
 
-            result = f"╔══ 🎡 룰렛 ══╗\n"
-            result += f"  결과: {label}\n\n"
-            result += f"  배팅: {bet}포인트\n"
-            if won > 0:
-                result += f"  획득: +{won}포인트\n"
-            else:
-                result += f"  손실: {won}포인트\n"
-            result += f"  잔여: {new_point}포인트\n"
-            result += "╚══════════════════╝"
-            bot.reply_to(message, result)
+            bot.reply_to(message,
+                f"╔══ 🎡 룰렛 ══╗\n"
+                f"  결과: {label}\n\n"
+                f"  배팅: {bet}포인트\n"
+                f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
+                f"  잔여: {new_point}포인트\n"
+                f"╚══════════════════╝"
+            )
 
         # ==================== /가위바위보 ====================
         elif '/가위바위보' in text:
@@ -310,40 +359,38 @@ def handle_all(message):
                     break
 
             if not user_choice:
-                bot.reply_to(message, "✌️ 사용법: /가위바위보 [가위/바위/보]\n예시: /가위바위보 가위\n\n⚠️ 참가비: 20포인트\n  이기면 40포인트 획득!")
+                bot.reply_to(message,
+                    "✌️ 사용법: /가위바위보 [가위/바위/보]\n"
+                    "예시: /가위바위보 가위\n\n"
+                    "⚠️ 참가비: 20포인트\n"
+                    "  이기면 40포인트 획득!"
+                )
                 return
 
             bot_choice = random.choice(choices)
             update_point(user_id, group_id, first_name, username, -20)
 
             if user_choice == bot_choice:
-                result_text = "🤝 비겼어요!"
+                result_text, won = "🤝 비겼어요!", 0
                 update_point(user_id, group_id, first_name, username, 20)
-                won = 0
             elif (user_choice == '✊ 바위' and bot_choice == '✌️ 가위') or \
                  (user_choice == '✌️ 가위' and bot_choice == '🖐 보') or \
                  (user_choice == '🖐 보' and bot_choice == '✊ 바위'):
-                result_text = "🎉 이겼어요!"
+                result_text, won = "🎉 이겼어요!", 20
                 update_point(user_id, group_id, first_name, username, 40)
-                won = 20
             else:
-                result_text = "💀 졌어요!"
-                won = -20
+                result_text, won = "💀 졌어요!", -20
 
             new_point = get_point(user_id, group_id)
-            result = f"╔══ ✌️ 가위바위보 ══╗\n"
-            result += f"  나:  {user_choice}\n"
-            result += f"  봇:  {bot_choice}\n\n"
-            result += f"  {result_text}\n\n"
-            if won > 0:
-                result += f"  획득: +{won}포인트\n"
-            elif won < 0:
-                result += f"  손실: {won}포인트\n"
-            else:
-                result += f"  참가비 반환!\n"
-            result += f"  잔여: {new_point}포인트\n"
-            result += "╚══════════════════╝"
-            bot.reply_to(message, result)
+            bot.reply_to(message,
+                f"╔══ ✌️ 가위바위보 ══╗\n"
+                f"  나:  {user_choice}\n"
+                f"  봇:  {bot_choice}\n\n"
+                f"  {result_text}\n\n"
+                f"  {'획득: +' + str(won) if won > 0 else '참가비 반환!' if won == 0 else '손실: ' + str(won)}포인트\n"
+                f"  잔여: {new_point}포인트\n"
+                f"╚══════════════════╝"
+            )
 
         # ==================== /채팅랭킹 ====================
         elif '/채팅랭킹' in text:
