@@ -177,7 +177,7 @@ def handle_all(message):
                 f"  👤 {first_name}님\n\n"
                 f"  🎁 획득: 100포인트\n"
                 f"  💰 잔여: {total}포인트\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
 
         # ==================== /리필 ====================
@@ -218,8 +218,36 @@ def handle_all(message):
                 f"  🎁 획득: 100포인트\n"
                 f"  💰 잔여: {new_point}포인트\n"
                 f"  📊 오늘 남은 리필: {remaining}회\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
+
+        # ==================== /포인트랭킹 ====================
+        elif '/포인트랭킹' in text:
+            if message.chat.type == 'private':
+                return
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT first_name, username, point
+                FROM points
+                WHERE group_id=%s
+                ORDER BY point DESC
+                LIMIT 5
+            """, (group_id,))
+            rows = cursor.fetchall()
+            cursor.close()
+            db.close()
+
+            medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+            result = "╔══ 💰 포인트 랭킹 ══╗\n\n"
+            if not rows:
+                result += "  포인트 기록이 없어요 😅\n"
+            else:
+                for i, row in enumerate(rows):
+                    name = row[0] or row[1] or '익명'
+                    result += f"  {medals[i]} {name:<10} {row[2]}포인트\n"
+            result += "╚════════════════╝"
+            bot.reply_to(message, result)
 
         # ==================== /포인트 ====================
         elif '/포인트' in text:
@@ -230,7 +258,7 @@ def handle_all(message):
                 f"╔══ 💰 포인트 ══╗\n"
                 f"  👤 {first_name}님\n\n"
                 f"  💰 잔여: {point}포인트\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
 
         # ==================== /게임 ====================
@@ -295,7 +323,7 @@ def handle_all(message):
                 f"  배팅: {bet}포인트\n"
                 f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
 
         # ==================== /룰렛 ====================
@@ -338,7 +366,7 @@ def handle_all(message):
                 f"  배팅: {bet}포인트\n"
                 f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
 
         # ==================== /가위바위보 ====================
@@ -389,7 +417,7 @@ def handle_all(message):
                 f"  {result_text}\n\n"
                 f"  {'획득: +' + str(won) if won > 0 else '참가비 반환!' if won == 0 else '손실: ' + str(won)}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚══════════════════╝"
+                f"╚════════════════╝"
             )
 
         # ==================== /채팅랭킹 ====================
@@ -417,7 +445,7 @@ def handle_all(message):
                 for i, row in enumerate(rows):
                     name = row[0] or row[1] or '익명'
                     result += f"  {medals[i]} {name:<10} {row[2]}개\n"
-            result += "╚══════════════════╝"
+            result += "╚════════════════╝"
             bot.reply_to(message, result)
 
         # ==================== /채팅 ====================
@@ -445,7 +473,7 @@ def handle_all(message):
             result += f"  🗓 이번 달   {month_count}개\n"
             result += f"  💬 전체      {total_count}개\n\n"
             result += f"  🎀 오늘도 열심히 채팅했어요!\n"
-            result += "╚══════════════════╝"
+            result += "╚════════════════╝"
             bot.reply_to(message, result)
 
         # ==================== 메시지 기록 ====================
