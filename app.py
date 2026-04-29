@@ -58,7 +58,7 @@ def init_db():
             first_name VARCHAR(255),
             username VARCHAR(255),
             point INTEGER DEFAULT 0,
-            last_attendance TIMESTAMP,
+            last_attendance DATE,
             UNIQUE(user_id, group_id)
         )
     """)
@@ -69,7 +69,17 @@ def init_db():
             group_id BIGINT NOT NULL,
             first_name VARCHAR(255),
             username VARCHAR(255),
-            refill_date TIMESTAMP NOT NULL
+            refill_date DATE NOT NULL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS highlow_games (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            group_id BIGINT NOT NULL,
+            current_card INTEGER NOT NULL,
+            bet INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
     db.commit()
@@ -109,6 +119,12 @@ def save_message(user_id, username, first_name, group_id):
     cursor.close()
     db.close()
 
+def card_emoji(num):
+    cards = {1:'🂡 A', 2:'🂢 2', 3:'🂣 3', 4:'🂤 4', 5:'🂥 5',
+             6:'🂦 6', 7:'🂧 7', 8:'🂨 8', 9:'🂩 9', 10:'🂪 10',
+             11:'🂫 J', 12:'🂭 Q', 13:'🂮 K'}
+    return cards.get(num, str(num))
+
 @bot.message_handler(func=lambda m: True)
 def handle_all(message):
     try:
@@ -118,6 +134,7 @@ def handle_all(message):
         group_id = message.chat.id
         first_name = message.from_user.first_name or '사용자'
         username = message.from_user.username or ''
+        today = datetime.now().date()
 
         # ==================== /test ====================
         if '/test' in text:
@@ -143,28 +160,21 @@ def handle_all(message):
                 return
             db = get_db()
             cursor = db.cursor()
-            cursor.execute("SELECT last_attendance, point FROM points WHERE user_id=%s AND group_id=%s", (user_id, group_id))
+            cursor.execute("SELECT last_attendance FROM points WHERE user_id=%s AND group_id=%s", (user_id, group_id))
             row = cursor.fetchone()
-            now = datetime.now()
 
-            if row and row[0]:
-                last = row[0]
-                diff = now - last
-                if diff.total_seconds() < 86400:
-                    remaining = 86400 - diff.total_seconds()
-                    hours = int(remaining // 3600)
-                    minutes = int((remaining % 3600) // 60)
-                    cursor.close()
-                    db.close()
-                    bot.reply_to(message, f"⏰ 이미 출석했어요!\n{hours}시간 {minutes}분 후에 다시 출석할 수 있어요.")
-                    return
+            if row and row[0] == today:
+                cursor.close()
+                db.close()
+                bot.reply_to(message, "⏰ 오늘 이미 출석했어요!\n자정(00:00)이 지나면 다시 출석할 수 있어요 😊")
+                return
 
             cursor.execute("""
                 INSERT INTO points (user_id, group_id, first_name, username, point, last_attendance)
                 VALUES (%s, %s, %s, %s, 100, %s)
                 ON CONFLICT (user_id, group_id)
                 DO UPDATE SET point = points.point + 100, last_attendance=%s, first_name=%s, username=%s
-            """, (user_id, group_id, first_name, username, now, now, first_name, username))
+            """, (user_id, group_id, first_name, username, today, today, first_name, username))
             db.commit()
 
             cursor.execute("SELECT point FROM points WHERE user_id=%s AND group_id=%s", (user_id, group_id))
@@ -177,7 +187,8 @@ def handle_all(message):
                 f"  👤 {first_name}님\n\n"
                 f"  🎁 획득: 100포인트\n"
                 f"  💰 잔여: {total}포인트\n"
-                f"╚════════════════╝"
+                f"  🔄 리셋: 매일 자정 00:00\n"
+                f"╚══════════════════╝"
             )
 
         # ==================== /리필 ====================
@@ -186,31 +197,30 @@ def handle_all(message):
                 return
             db = get_db()
             cursor = db.cursor()
-            today = datetime.now().date()
 
             cursor.execute("""
                 SELECT COUNT(*) FROM refill_logs
-                WHERE user_id=%s AND group_id=%s AND DATE(refill_date)=%s
+                WHERE user_id=%s AND group_id=%s AND refill_date=%s
             """, (user_id, group_id, today))
             count = cursor.fetchone()[0]
 
-            if count >= 3:
+            if count >= 5:
                 cursor.close()
                 db.close()
-                bot.reply_to(message, "⚠️ 오늘 리필을 3번 모두 사용했어요!\n내일 다시 시도해주세요 😊")
+                bot.reply_to(message, "⚠️ 오늘 리필을 5번 모두 사용했어요!\n자정(00:00)이 지나면 다시 사용할 수 있어요 😊")
                 return
 
             cursor.execute("""
                 INSERT INTO refill_logs (user_id, group_id, first_name, username, refill_date)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, group_id, first_name, username, datetime.now()))
+            """, (user_id, group_id, first_name, username, today))
             db.commit()
             cursor.close()
             db.close()
 
             update_point(user_id, group_id, first_name, username, 100)
             new_point = get_point(user_id, group_id)
-            remaining = 3 - (count + 1)
+            remaining = 5 - (count + 1)
 
             bot.reply_to(message,
                 f"╔══ 🔄 리필 완료 ══╗\n"
@@ -218,7 +228,8 @@ def handle_all(message):
                 f"  🎁 획득: 100포인트\n"
                 f"  💰 잔여: {new_point}포인트\n"
                 f"  📊 오늘 남은 리필: {remaining}회\n"
-                f"╚════════════════╝"
+                f"  🔄 리셋: 매일 자정 00:00\n"
+                f"╚══════════════════╝"
             )
 
         # ==================== /포인트랭킹 ====================
@@ -246,7 +257,7 @@ def handle_all(message):
                 for i, row in enumerate(rows):
                     name = row[0] or row[1] or '익명'
                     result += f"  {medals[i]} {name:<10} {row[2]}포인트\n"
-            result += "╚════════════════╝"
+            result += "╚══════════════════╝"
             bot.reply_to(message, result)
 
         # ==================== /포인트 ====================
@@ -258,7 +269,7 @@ def handle_all(message):
                 f"╔══ 💰 포인트 ══╗\n"
                 f"  👤 {first_name}님\n\n"
                 f"  💰 잔여: {point}포인트\n"
-                f"╚════════════════╝"
+                f"╚══════════════════╝"
             )
 
         # ==================== /게임 ====================
@@ -267,8 +278,117 @@ def handle_all(message):
                 "🎮 게임 목록\n\n"
                 "🎰 /슬롯 [배팅] - 슬롯머신\n"
                 "🎡 /룰렛 [배팅] - 룰렛\n"
-                "✌️ /가위바위보 [가위/바위/보] - 가위바위보\n\n"
+                "✌️ /가위바위보 [가위/바위/보] - 가위바위보\n"
+                "🃏 /하이로우 [배팅] - 하이로우\n\n"
                 "⚠️ 최소 참가비: 20포인트"
+            )
+
+        # ==================== /하이로우 ====================
+        elif '/하이로우' in text:
+            if message.chat.type == 'private':
+                return
+            parts = text.split()
+
+            # 진행중인 게임 확인
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT id, current_card, bet FROM highlow_games
+                WHERE user_id=%s AND group_id=%s
+                ORDER BY created_at DESC LIMIT 1
+            """, (user_id, group_id))
+            game = cursor.fetchone()
+
+            # 높음/낮음 선택한 경우
+            if game and len(parts) >= 2 and parts[1] in ['높음', '낮음']:
+                game_id, current_card, bet = game
+                choice = parts[1]
+                next_card = random.randint(1, 13)
+
+                # 게임 삭제
+                cursor.execute("DELETE FROM highlow_games WHERE id=%s", (game_id,))
+                db.commit()
+                cursor.close()
+                db.close()
+
+                point = get_point(user_id, group_id)
+                if point < bet:
+                    bot.reply_to(message, f"💸 포인트가 부족해요!\n현재 포인트: {point}포인트")
+                    return
+
+                if next_card == current_card:
+                    result_text = "😅 같은 숫자! 무승부!"
+                    won = 0
+                elif (choice == '높음' and next_card > current_card) or \
+                     (choice == '낮음' and next_card < current_card):
+                    result_text = "🎉 정답! 이겼어요!"
+                    won = bet
+                    update_point(user_id, group_id, first_name, username, bet)
+                else:
+                    result_text = "💀 틀렸어요! 졌어요!"
+                    won = -bet
+                    update_point(user_id, group_id, first_name, username, -bet)
+
+                new_point = get_point(user_id, group_id)
+                bot.reply_to(message,
+                    f"╔══ 🃏 하이로우 ══╗\n"
+                    f"  이전 카드: {card_emoji(current_card)}\n"
+                    f"  다음 카드: {card_emoji(next_card)}\n\n"
+                    f"  {result_text}\n\n"
+                    f"  배팅: {bet}포인트\n"
+                    f"  {'획득: +' + str(won) if won > 0 else '무승부!' if won == 0 else '손실: ' + str(won)}포인트\n"
+                    f"  잔여: {new_point}포인트\n"
+                    f"╚══════════════════╝"
+                )
+                return
+
+            # 새 게임 시작
+            if len(parts) < 2 or not parts[1].isdigit():
+                cursor.close()
+                db.close()
+                bot.reply_to(message,
+                    "🃏 사용법: /하이로우 [배팅포인트]\n"
+                    "예시: /하이로우 100\n\n"
+                    "카드를 받은 후:\n"
+                    "/하이로우 높음 → 다음 카드가 높을 것 같을 때\n"
+                    "/하이로우 낮음 → 다음 카드가 낮을 것 같을 때\n\n"
+                    "⚠️ 최소 배팅: 20포인트"
+                )
+                return
+
+            bet = int(parts[1])
+            if bet < 20:
+                cursor.close()
+                db.close()
+                bot.reply_to(message, "⚠️ 최소 배팅은 20포인트예요!")
+                return
+
+            point = get_point(user_id, group_id)
+            if point < bet:
+                cursor.close()
+                db.close()
+                bot.reply_to(message, f"💸 포인트가 부족해요!\n현재 포인트: {point}포인트")
+                return
+
+            # 기존 게임 삭제 후 새 게임 시작
+            cursor.execute("DELETE FROM highlow_games WHERE user_id=%s AND group_id=%s", (user_id, group_id))
+            current_card = random.randint(1, 13)
+            cursor.execute("""
+                INSERT INTO highlow_games (user_id, group_id, current_card, bet)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, group_id, current_card, bet))
+            db.commit()
+            cursor.close()
+            db.close()
+
+            bot.reply_to(message,
+                f"╔══ 🃏 하이로우 ══╗\n"
+                f"  카드: {card_emoji(current_card)}\n\n"
+                f"  다음 카드가 높을까요 낮을까요?\n\n"
+                f"  👆 /하이로우 높음\n"
+                f"  👇 /하이로우 낮음\n\n"
+                f"  배팅: {bet}포인트\n"
+                f"╚══════════════════╝"
             )
 
         # ==================== /슬롯 ====================
@@ -323,7 +443,7 @@ def handle_all(message):
                 f"  배팅: {bet}포인트\n"
                 f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚════════════════╝"
+                f"╚══════════════════╝"
             )
 
         # ==================== /룰렛 ====================
@@ -366,7 +486,7 @@ def handle_all(message):
                 f"  배팅: {bet}포인트\n"
                 f"  {'획득: +' if won > 0 else '손실: '}{won}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚════════════════╝"
+                f"╚══════════════════╝"
             )
 
         # ==================== /가위바위보 ====================
@@ -417,14 +537,13 @@ def handle_all(message):
                 f"  {result_text}\n\n"
                 f"  {'획득: +' + str(won) if won > 0 else '참가비 반환!' if won == 0 else '손실: ' + str(won)}포인트\n"
                 f"  잔여: {new_point}포인트\n"
-                f"╚════════════════╝"
+                f"╚══════════════════╝"
             )
 
         # ==================== /채팅랭킹 ====================
         elif '/채팅랭킹' in text:
             if message.chat.type == 'private':
                 return
-            today = datetime.now().date()
             monday = today - timedelta(days=today.weekday())
             sunday = monday + timedelta(days=6)
             db = get_db()
@@ -445,7 +564,7 @@ def handle_all(message):
                 for i, row in enumerate(rows):
                     name = row[0] or row[1] or '익명'
                     result += f"  {medals[i]} {name:<10} {row[2]}개\n"
-            result += "╚════════════════╝"
+            result += "╚══════════════════╝"
             bot.reply_to(message, result)
 
         # ==================== /채팅 ====================
@@ -454,7 +573,6 @@ def handle_all(message):
                 return
             db = get_db()
             cursor = db.cursor()
-            today = datetime.now().date()
             cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE user_id=%s AND group_id=%s AND DATE(message_date)=%s", (user_id, group_id, today))
             today_count = cursor.fetchone()[0]
             monday = today - timedelta(days=today.weekday())
@@ -473,7 +591,7 @@ def handle_all(message):
             result += f"  🗓 이번 달   {month_count}개\n"
             result += f"  💬 전체      {total_count}개\n\n"
             result += f"  🎀 오늘도 열심히 채팅했어요!\n"
-            result += "╚════════════════╝"
+            result += "╚══════════════════╝"
             bot.reply_to(message, result)
 
         # ==================== 메시지 기록 ====================
