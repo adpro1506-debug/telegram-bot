@@ -520,6 +520,78 @@ def handle_all(message):
                 f"╚══════════════════╝"
             )
 
+        # ==================== /선물 ====================
+        elif '/선물' in text:
+            if message.chat.type == 'private':
+                bot.reply_to(message, "⚠️ 선물은 그룹에서만 사용할 수 있어요!")
+                return
+
+            # 답장 대상 확인
+            if not message.reply_to_message:
+                bot.reply_to(message,
+                    "🎁 사용법: 선물할 상대의 메시지에 답장으로\n"
+                    "/선물 [포인트]\n\n"
+                    "예시: /선물 100\n\n"
+                    "⚠️ 최소 선물: 10포인트"
+                )
+                return
+
+            parts = text.split()
+            if len(parts) < 2 or not parts[1].isdigit():
+                bot.reply_to(message,
+                    "🎁 사용법: 선물할 상대의 메시지에 답장으로\n"
+                    "/선물 [포인트]\n\n"
+                    "예시: /선물 100\n\n"
+                    "⚠️ 최소 선물: 10포인트"
+                )
+                return
+
+            amount = int(parts[1])
+
+            if amount < 10:
+                bot.reply_to(message, "⚠️ 최소 선물 포인트는 10포인트예요!")
+                return
+
+            target = message.reply_to_message.from_user
+            target_id = target.id
+            target_name = target.first_name or '상대방'
+
+            # 자기 자신에게 선물 방지
+            if target_id == user_id:
+                bot.reply_to(message, "⚠️ 자기 자신에게는 선물할 수 없어요!")
+                return
+
+            # 봇에게 선물 방지
+            if target.is_bot:
+                bot.reply_to(message, "⚠️ 봇에게는 선물할 수 없어요!")
+                return
+
+            # 보내는 사람 포인트 확인
+            my_point = get_point(user_id, group_id)
+            if my_point < amount:
+                bot.reply_to(message,
+                    f"💸 포인트가 부족해요!\n"
+                    f"  보유: {my_point}포인트\n"
+                    f"  필요: {amount}포인트"
+                )
+                return
+
+            # 포인트 이동
+            update_point(user_id, group_id, first_name, username, -amount)
+            update_point(target_id, group_id, target_name, target.username or '', amount)
+
+            my_new_point = get_point(user_id, group_id)
+            target_new_point = get_point(target_id, group_id)
+
+            bot.reply_to(message,
+                f"╔══ 🎁 포인트 선물 ══╗\n"
+                f"  💝 {first_name} → {target_name}\n\n"
+                f"  🎀 선물: {amount}포인트\n\n"
+                f"  📤 {first_name} 잔여: {my_new_point}포인트\n"
+                f"  📥 {target_name} 잔여: {target_new_point}포인트\n"
+                f"╚══════════════════╝"
+            )
+
         # ==================== /포인트랭킹 ====================
         elif '/포인트랭킹' in text:
             if message.chat.type == 'private':
