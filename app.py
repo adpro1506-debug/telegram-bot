@@ -33,6 +33,36 @@ AFFILIATE_TEXT = """❤️카지노❤️
 [평생제휴]1️⃣저승사자 https://t.me/gamte59/42
 [도파민제휴]2️⃣김여포 https://t.me/gamte59/58"""
 
+FORTUNE_LIST = [
+    ("🌟 대길", "오늘은 모든 일이 술술 풀리는 날이에요! 새로운 도전을 해보세요. 금전운 ★★★★★"),
+    ("☀️ 길", "좋은 일이 생길 징조가 보여요! 긍정적인 마음으로 하루를 시작하세요. 금전운 ★★★★☆"),
+    ("🌤 중길", "평범하지만 안정적인 하루가 될 거예요. 무리하지 말고 차분하게 진행하세요. 금전운 ★★★☆☆"),
+    ("🌥 소길", "작은 행운이 찾아올 수 있어요. 주변을 잘 살펴보세요. 금전운 ★★☆☆☆"),
+    ("⛅ 평", "특별한 일은 없지만 평온한 하루예요. 현재에 집중하세요. 금전운 ★★★☆☆"),
+    ("🌦 소흉", "작은 어려움이 있을 수 있어요. 신중하게 행동하세요. 금전운 ★★☆☆☆"),
+    ("🌧 흉", "오늘은 중요한 결정을 미루는 게 좋아요. 조심하는 하루로 만드세요. 금전운 ★☆☆☆☆"),
+    ("🌟 재물운 상승", "오늘 금전적인 행운이 따라요! 투자나 거래에 좋은 날이에요. 금전운 ★★★★★"),
+    ("💕 인연운 상승", "새로운 인연이 생길 수 있어요! 만남에 적극적으로 임해보세요. 금전운 ★★★☆☆"),
+    ("💪 건강운 상승", "오늘은 체력이 넘치는 날! 운동을 시작하기 좋은 날이에요. 금전운 ★★★☆☆"),
+    ("🎯 집중력 상승", "오늘은 집중력이 최고조! 중요한 일을 오늘 처리하세요. 금전운 ★★★★☆"),
+    ("🍀 행운의 날", "오늘은 특별한 행운이 찾아오는 날! 기회를 놓치지 마세요. 금전운 ★★★★★"),
+]
+
+FORTUNE_ADVICE = [
+    "오늘의 행운 아이템: 🔴 빨간색",
+    "오늘의 행운 아이템: 🔵 파란색",
+    "오늘의 행운 아이템: 🟡 노란색",
+    "오늘의 행운 아이템: 🟢 초록색",
+    "오늘의 행운 번호: 7",
+    "오늘의 행운 번호: 3",
+    "오늘의 행운 번호: 9",
+    "오늘의 행운 번호: 1",
+    "오늘의 행운 음식: 🍜 따뜻한 국물 요리",
+    "오늘의 행운 음식: 🍱 간단한 도시락",
+    "오늘의 행운 음식: 🍣 해산물 요리",
+    "오늘의 행운 음식: 🥗 신선한 샐러드",
+]
+
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
 
@@ -82,6 +112,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT NOW()
         )
     """)
+    # last_attendance 컬럼 DATE 타입으로 변경
+    try:
+        cursor.execute("""
+            ALTER TABLE points 
+            ALTER COLUMN last_attendance TYPE DATE 
+            USING last_attendance::DATE
+        """)
+        db.commit()
+    except:
+        db.rollback()
+
     db.commit()
     cursor.close()
     db.close()
@@ -120,10 +161,17 @@ def save_message(user_id, username, first_name, group_id):
     db.close()
 
 def card_emoji(num):
-    cards = {1:'🂡 A', 2:'🂢 2', 3:'🂣 3', 4:'🂤 4', 5:'🂥 5',
-             6:'🂦 6', 7:'🂧 7', 8:'🂨 8', 9:'🂩 9', 10:'🂪 10',
-             11:'🂫 J', 12:'🂭 Q', 13:'🂮 K'}
+    cards = {1:'A', 2:'2', 3:'3', 4:'4', 5:'5',
+             6:'6', 7:'7', 8:'8', 9:'9', 10:'10',
+             11:'J', 12:'Q', 13:'K'}
     return cards.get(num, str(num))
+
+def get_daily_fortune(user_id, today):
+    seed = int(str(user_id) + today.strftime('%Y%m%d'))
+    rng = random.Random(seed)
+    fortune = rng.choice(FORTUNE_LIST)
+    advice = rng.choice(FORTUNE_ADVICE)
+    return fortune, advice
 
 @bot.message_handler(func=lambda m: True)
 def handle_all(message):
@@ -154,13 +202,33 @@ def handle_all(message):
         elif '/제휴' in text:
             bot.reply_to(message, AFFILIATE_TEXT, disable_web_page_preview=True)
 
+        # ==================== /운세 ====================
+        elif '/운세' in text:
+            if message.chat.type == 'private':
+                return
+            fortune, advice = get_daily_fortune(user_id, today)
+            title, desc = fortune
+            result = (
+                f"╔══ 🔮 오늘의 운세 ══╗\n"
+                f"  👤 {first_name}님\n"
+                f"  📅 {today.strftime('%Y년 %m월 %d일')}\n\n"
+                f"  {title}\n\n"
+                f"  {desc}\n\n"
+                f"  🍀 {advice}\n"
+                f"╚══════════════════╝"
+            )
+            bot.reply_to(message, result)
+
         # ==================== /출석 ====================
         elif '/출석' in text:
             if message.chat.type == 'private':
                 return
             db = get_db()
             cursor = db.cursor()
-            cursor.execute("SELECT last_attendance FROM points WHERE user_id=%s AND group_id=%s", (user_id, group_id))
+            cursor.execute(
+                "SELECT last_attendance FROM points WHERE user_id=%s AND group_id=%s",
+                (user_id, group_id)
+            )
             row = cursor.fetchone()
 
             if row and row[0] == today:
@@ -240,10 +308,8 @@ def handle_all(message):
             cursor = db.cursor()
             cursor.execute("""
                 SELECT first_name, username, point
-                FROM points
-                WHERE group_id=%s
-                ORDER BY point DESC
-                LIMIT 5
+                FROM points WHERE group_id=%s
+                ORDER BY point DESC LIMIT 5
             """, (group_id,))
             rows = cursor.fetchall()
             cursor.close()
@@ -288,8 +354,6 @@ def handle_all(message):
             if message.chat.type == 'private':
                 return
             parts = text.split()
-
-            # 진행중인 게임 확인
             db = get_db()
             cursor = db.cursor()
             cursor.execute("""
@@ -299,34 +363,24 @@ def handle_all(message):
             """, (user_id, group_id))
             game = cursor.fetchone()
 
-            # 높음/낮음 선택한 경우
             if game and len(parts) >= 2 and parts[1] in ['높음', '낮음']:
                 game_id, current_card, bet = game
                 choice = parts[1]
                 next_card = random.randint(1, 13)
 
-                # 게임 삭제
                 cursor.execute("DELETE FROM highlow_games WHERE id=%s", (game_id,))
                 db.commit()
                 cursor.close()
                 db.close()
 
-                point = get_point(user_id, group_id)
-                if point < bet:
-                    bot.reply_to(message, f"💸 포인트가 부족해요!\n현재 포인트: {point}포인트")
-                    return
-
                 if next_card == current_card:
-                    result_text = "😅 같은 숫자! 무승부!"
-                    won = 0
+                    result_text, won = "😅 같은 숫자! 무승부!", 0
                 elif (choice == '높음' and next_card > current_card) or \
                      (choice == '낮음' and next_card < current_card):
-                    result_text = "🎉 정답! 이겼어요!"
-                    won = bet
+                    result_text, won = "🎉 정답! 이겼어요!", bet
                     update_point(user_id, group_id, first_name, username, bet)
                 else:
-                    result_text = "💀 틀렸어요! 졌어요!"
-                    won = -bet
+                    result_text, won = "💀 틀렸어요! 졌어요!", -bet
                     update_point(user_id, group_id, first_name, username, -bet)
 
                 new_point = get_point(user_id, group_id)
@@ -342,7 +396,6 @@ def handle_all(message):
                 )
                 return
 
-            # 새 게임 시작
             if len(parts) < 2 or not parts[1].isdigit():
                 cursor.close()
                 db.close()
@@ -370,7 +423,6 @@ def handle_all(message):
                 bot.reply_to(message, f"💸 포인트가 부족해요!\n현재 포인트: {point}포인트")
                 return
 
-            # 기존 게임 삭제 후 새 게임 시작
             cursor.execute("DELETE FROM highlow_games WHERE user_id=%s AND group_id=%s", (user_id, group_id))
             current_card = random.randint(1, 13)
             cursor.execute("""
