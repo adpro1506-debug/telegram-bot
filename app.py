@@ -11,27 +11,28 @@ bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
 AFFILIATE_TEXT = """❤️카지노❤️
-[평생제휴] 1️⃣렛츠뱃 https://t.me/gamte59/31
-[평생제휴] 2️⃣예스뱃 https://t.me/gamte59/28
-[도파민제휴]3️⃣지엑스뱃 https://t.me/gamte59/44
-[도파민제휴]4️⃣케이비씨겜 https://t.me/gamte59/46
-[도파민제휴]5️⃣블록체인바카라 https://t.me/gamte59/49
-[도파민제휴]6️⃣썬뱃 https://t.me/gamte59/51
-[도마민제휴]7️⃣우루스카지노 https://t.me/gamte59/60
+[평생제휴] 1️⃣ <a href="https://t.me/gamte59/31">렛츠뱃</a>
+[평생제휴] 2️⃣ <a href="https://t.me/gamte59/28">예스뱃</a>
+[도파민제휴] 3️⃣ <a href="https://t.me/gamte59/44">지엑스뱃</a>
+[도파민제휴] 4️⃣ <a href="https://t.me/gamte59/46">케이비씨겜</a>
+[도파민제휴] 5️⃣ <a href="https://t.me/gamte59/49">블록체인바카라</a>
+[도파민제휴] 6️⃣ <a href="https://t.me/gamte59/51">썬뱃</a>
+[도파민제휴] 7️⃣ <a href="https://t.me/gamte59/60">우루스카지노</a>
+[도파민제휴] 8️⃣ <a href="https://t.me/MALINAVIP77">마닐라</a>
 
 ❤️급전❤️
-[도파민제휴]1️⃣OR급전 https://t.me/gamte59/16
-[도파민제휴]2️⃣프리티켓 https://t.me/gamte59/33
+[도파민제휴] 1️⃣ <a href="https://t.me/gamte59/16">OR급전</a>
+[도파민제휴] 2️⃣ <a href="https://t.me/gamte59/33">프리티켓</a>
 
 ❤️장집❤️
-[도파민제휴]1️⃣미호 장집 https://t.me/gamte59/37
+[도파민제휴] 1️⃣ <a href="https://t.me/gamte59/37">미호 장집</a>
 
 ❤️반환팀❤️
-[도파민제휴]1️⃣울프 반환팀 https://t.me/gamte59/39
+[도파민제휴] 1️⃣ <a href="https://t.me/gamte59/39">울프 반환팀</a>
 
 ❤️충전 계좌매입❤️
-[평생제휴]1️⃣저승사자 https://t.me/gamte59/42
-[도파민제휴]2️⃣김여포 https://t.me/gamte59/58"""
+[평생제휴] 1️⃣ <a href="https://t.me/gamte59/42">저승사자</a>
+[도파민제휴] 2️⃣ <a href="https://t.me/gamte59/58">김여포</a>"""
 
 # ==================== 운세 데이터 ====================
 CARD_TITLES = [
@@ -425,7 +426,7 @@ def handle_all(message):
 
         # ==================== /제휴 ====================
         elif '/제휴' in text:
-            bot.reply_to(message, AFFILIATE_TEXT, disable_web_page_preview=True)
+            bot.reply_to(message, AFFILIATE_TEXT, parse_mode='HTML', disable_web_page_preview=True)
 
         # ==================== /운세 ====================
         elif '/운세' in text:
