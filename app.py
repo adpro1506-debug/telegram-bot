@@ -32,7 +32,8 @@ AFFILIATE_TEXT = """❤️카지노❤️
 
 ❤️충전 계좌매입❤️
 [평생제휴] 1️⃣ <a href="https://t.me/gamte59/42">저승사자</a>
-[도파민제휴] 2️⃣ <a href="https://t.me/gamte59/58">김여포</a>"""
+[도파민제휴] 2️⃣ ️<a href="https://t.me/gamte59/58">김여포</a>
+[도파민제휴] 2️⃣ <a href="https://t.me/gamte59/64">대문팀</a>"""
 
 # ==================== 운세 데이터 ====================
 CARD_TITLES = [
